@@ -1,0 +1,8 @@
+[package]
+name = "braindump"
+version = "0.1.0"
+authors = ["ex0dus-0x <ex0dus@codemuch.tech>"]
+
+[dependencies]
+nix = "0.12.0"
+goblin = "0.0.19"
