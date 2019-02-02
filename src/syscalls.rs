@@ -1,8 +1,13 @@
 /// syscalls.rs
 ///     
-///     Defines wrappers to commonly used system calls
-///     during process tracing and other interactions.
-///     TODO: define syscall wrappers
+///     wrappers:
+///         Defines wrappers to commonly used system calls
+///         during process tracing and other interactions.
+///
+///     syscalls:
+///         De/serializable system call representations for
+///         output reasoning.
+///
 
 pub mod wrappers {
 
@@ -12,6 +17,15 @@ pub mod wrappers {
 
     pub fn execve();
 
-    pub fn waitpid();;
+    pub fn waitpid();
+}
+
+pub mod syscalls {
+
+    #[derive(Serialize, Deserialize, Syscall)]
+    pub enum Syscall {
+        /// TODO
+
+    }
 
 }

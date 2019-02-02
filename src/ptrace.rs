@@ -2,8 +2,8 @@
 ///
 ///     Currently, `nix` support for `ptrace(2)` on the most recent
 ///     version of the crate (as of working, 0.12.0) is deprecated.
-///     This is a re-implementation of `ptrace(2)` for braindump
-///     that allows safer usage through a specialized helper function.
+///     This is a re-implementation of `ptrace(2)` that allows safer 
+///     usage through a specialized helper function.
 
 mod ptrace {
     use libc::{c_int, c_long, c_void, pid_t};
@@ -93,16 +93,22 @@ mod ptrace {
     }
 }
 
-
+/// defines helper functions that interact with `exec_ptrace`
+/// in order to perform process debugging.
 pub mod helpers {
     use std::ptr;
     use std::ffi::CString;
     use libc::pid_t;
     use nix::errno::Errno; 
     use ptrace::ptrace::*;
-        
+
+    mod syscalls;
+    use syscalls::wrappers;
+
+    /// alias the pid_t for better clarification
     pub type InferiorType = pid_t;
-    
+
+
     /// `traceme()` call with error-checking. PTRACE_TRACEME is used as a method
     /// used to check the process that the user is currently in, such as ensuring that
     /// a fork call actually spawned off a child process.
@@ -112,18 +118,21 @@ pub mod helpers {
         }
     }
 
-    /// TODO: description 
+
+    /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart
+    /// stopped tracee process.
     pub fn cont(pid: InferiorType) -> () {
         if let Err(e) = exec_ptrace(PTRCE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
             panic!("Failed PTRACE_CONTINUE: {:?}", e);
         }
     }
 
+
     /// TODO: description
     pub fn inferior_exec(filename: &str, args: &[&str]) -> InferiorType {
         let c_filename = &CString::new(filename).unwrap();
         traceme();
-        execve(c_filename, &[], &[]);
+        wrappers::execve(c_filename, &[], &[]);
         unreachable!();
     }
 

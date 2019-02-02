@@ -3,9 +3,13 @@
               target_arch = "x86_64")),
 )]
 
+extern crate clap;
 extern crate libc;
 extern crate nix;
-extern crate clap;
+extern crate serde;
+
+#[macro_use] 
+extern crate serde_derive;
 
 mod ptrace;
 use ptrace::helpers;
