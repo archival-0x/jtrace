@@ -98,12 +98,11 @@ mod ptrace {
 pub mod helpers {
     use std::ptr;
     use std::ffi::CString;
+    use nix::errno::Errno;
+    use nix::sys::wait::waitpid;
     use libc::pid_t;
-    use nix::errno::Errno; 
+    
     use ptrace::ptrace::*;
-
-    mod syscalls;
-    use syscalls::wrappers;
 
     /// alias the pid_t for better clarification
     pub type InferiorType = pid_t;

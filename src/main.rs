@@ -11,6 +11,8 @@ extern crate serde;
 #[macro_use] 
 extern crate serde_derive;
 
+use clap::{App, Arg};
+
 mod ptrace;
 use ptrace::helpers;
 
@@ -42,8 +44,6 @@ fn main() {
     match matches.value_of("emit") {
         "raw"   => {},
         "json"  => {},
-        _       => {
-            panic!("unknown emit output type");
-        }
+        _       => panic!("unknown emit output type"),
     }
 }
