@@ -1,49 +1,43 @@
+/// main.rs
+///
+///     CLI entry point for ptrace wrapper and helper
+///     functions for performing process tracing
+///     and se/deserialization
+
 #[cfg(all(target_os = "linux",
           any(target_arch = "x86",
               target_arch = "x86_64")),
 )]
 
-extern crate clap;
 extern crate libc;
 extern crate nix;
-extern crate serde;
-
-#[macro_use] 
-extern crate serde_derive;
-
-use clap::{App, Arg};
 
 mod ptrace;
+
+use std::env;
+use std::process::Command;
+use std::os::unix::process::CommandExt;
+
 use ptrace::helpers;
 
+
 fn main() {
-    let matches = App::new("jd")
-                        .version("0.1.0")
-                        .author("Alan <ex0dus@codemuch.tech")
-                        .about("process trace to json utility")
-                        .arg(Arg::with_name("emit")
-                             .short("e")
-                             .long("emit")
-                             .value_name("OUTPUT_TYPE")
-                             .required(false)
-                             .help("sets type of output to emit"))
-                        .arg(Arg::with_name("command")
-                             .short("c")
-                             .long("command")
-                             .value_name("COMMAND")
-                             .min_value(1)
-                             .required(true)
-                             .help("sets command to trace"))
-                        .get_matches();
 
-    // retrieve commands
-    let commands: Vec<_> = matches.values_of("command")
-                                  .unwrap().collect();
+    // collect arguments (expect for this prog name)
+    let mut args = env::args_os().skip(1);
 
-    // parse emit type
-    match matches.value_of("emit") {
-        "raw"   => {},
-        "json"  => {},
-        _       => panic!("unknown emit output type"),
+    // initialize a command with process builder
+    let mut cmd = Command::new(args.next()
+                           .expect("usage: jtrace cmd [args...]"));
+    for arg in args {
+        cmd.arg(arg);
     }
+
+    // perform an initial TRACEME to determine current process
+    cmd.before_exec(|| {
+        helpers::traceme();
+    });
+
+    // initialize handle to child process
+    let child_handle = cmd.spawn().expect("failed spawning child process");
 }

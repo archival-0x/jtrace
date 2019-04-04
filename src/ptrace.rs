@@ -2,7 +2,7 @@
 ///
 ///     Currently, `nix` support for `ptrace(2)` on the most recent
 ///     version of the crate (as of working, 0.12.0) is deprecated.
-///     This is a re-implementation of `ptrace(2)` that allows safer 
+///     This is a re-implementation of `ptrace(2)` that allows safer
 ///     usage through a specialized helper function.
 
 mod ptrace {
@@ -23,7 +23,7 @@ mod ptrace {
     pub const PTRACE_PEEKUSER:    PtraceRequest = 3;
     pub const PTRACE_POKETEXT:    PtraceRequest = 4;
     pub const PTRACE_POKEDATA:    PtraceRequest = 5;
-    pub const PTRACE_POKEUSER:    PtraceRequest = 6; 
+    pub const PTRACE_POKEUSER:    PtraceRequest = 6;
     pub const PTRACE_CONT:        PtraceRequest = 7;
     pub const PTRACE_KILL:        PtraceRequest = 8;
     pub const PTRACE_SINGLESTEP:  PtraceRequest = 9;
@@ -50,13 +50,13 @@ mod ptrace {
 
     /// defines an `unsafe` foreign function interface to the `ptrace(2)` system call.
     /// `ptrace(2)`'s original C function definition is as follows:
-    /// 
+    ///
     /// ```
     ///     long ptrace(enum __ptrace_request request, pid_t pid,
     ///                 void *addr, void *data);
     /// ```
     extern {
-        fn ptrace(request: c_int, pid: pid_t, 
+        fn ptrace(request: c_int, pid: pid_t,
                   addr: * const c_void, data: * const c_void) -> c_long;
     }
 
@@ -84,7 +84,7 @@ mod ptrace {
             },
             _ => {},
         }
-                
+
         // for other conventional PTRACE_* commands
         match unsafe { ptrace(request, pid, addr, data) } {
             -1 => Err(Errno::last()),
@@ -93,15 +93,16 @@ mod ptrace {
     }
 }
 
+
+
 /// defines helper functions that interact with `exec_ptrace`
 /// in order to perform process debugging.
 pub mod helpers {
     use std::ptr;
-    use std::ffi::CString;
     use nix::errno::Errno;
     use nix::sys::wait::waitpid;
     use libc::pid_t;
-    
+
     use ptrace::ptrace::*;
 
     /// alias the pid_t for better clarification
@@ -111,38 +112,25 @@ pub mod helpers {
     /// `traceme()` call with error-checking. PTRACE_TRACEME is used as a method
     /// used to check the process that the user is currently in, such as ensuring that
     /// a fork call actually spawned off a child process.
-    pub fn traceme() -> () {
+    pub fn traceme() -> Result<(), Errno> {
         if let Err(e) = exec_ptrace(PTRACE_TRACEME, 0, ptr::null_mut(), ptr::null_mut()) {
-            panic!("Failed PTRACE_TRACEME: {:?}", e);
+            //panic!("Failed PTRACE_TRACEME: {:?}", e);
+            return Err(e);
         }
+        Ok(())
     }
 
 
     /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart
     /// stopped tracee process.
-    pub fn cont(pid: InferiorType) -> () {
-        if let Err(e) = exec_ptrace(PTRCE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
-            panic!("Failed PTRACE_CONTINUE: {:?}", e);
+    pub fn cont(pid: InferiorType) -> Result<(), Errno> {
+        if let Err(e) = exec_ptrace(PTRACE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
+            //panic!("Failed PTRACE_CONTINUE: {:?}", e);
+            return Err(e);
         }
+        Ok(())
     }
 
-
-    /// TODO: description
-    pub fn inferior_exec(filename: &str, args: &[&str]) -> InferiorType {
-        let c_filename = &CString::new(filename).unwrap();
-        traceme();
-        wrappers::execve(c_filename, &[], &[]);
-        unreachable!();
-    }
-
-
-    pub fn inferior_attach(pid: InferiorType) -> Result<InferiorType, Errno> {
-        match waitpid(pid, None) {
-            Ok(WaitStatus::Stopped(pid, signal::SIGTRAP)) => return Ok(pid),
-            Ok(_)                                         => panic!("Unexpected stop in attach"),
-            Err(e)                                        => return Err(e)
-        }
-    }
 
     /// `exec()` is the main helper method utilized during execution in order to
     /// fork off a child process and execute the specific program within that execution.
@@ -159,14 +147,6 @@ pub mod helpers {
     ///     // debugger
     /// ```
     pub fn exec(file: &str, args: &[&str]) -> Result<InferiorType, nix::errno::Errno> {
-        loop {
-            match syscalls::fork() {
-                Ok(Child)               => helpers::inferior_exec(file, args),
-                Ok(Parent(pid))         => return helpers::inferior_attach(pid),
-                Err(errno::EAGAIN)      => continue,
-                Err(e)                  => return Err(e)
-            };
-        }
-    }   
-
+        unreachable!();
+    }
 }
