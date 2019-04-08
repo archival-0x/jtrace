@@ -130,23 +130,4 @@ pub mod helpers {
         }
         Ok(())
     }
-
-
-    /// `exec()` is the main helper method utilized during execution in order to
-    /// fork off a child process and execute the specific program within that execution.
-    ///
-    /// This is equivalent to:
-    ///
-    /// ```
-    /// pid_t pid = fork();
-    /// if (pid == 0)
-    ///     // child process
-    ///     // execve
-    /// else
-    ///     // parent process
-    ///     // debugger
-    /// ```
-    pub fn exec(file: &str, args: &[&str]) -> Result<InferiorType, nix::errno::Errno> {
-        unreachable!();
-    }
 }
