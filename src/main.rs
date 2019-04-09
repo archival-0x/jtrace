@@ -12,19 +12,20 @@
 extern crate libc;
 extern crate nix;
 extern crate clap;
-extern crate log;
 
-mod ptrace;
+#[macro_use] extern crate log;
 
-use std::env;
 use std::process::Command;
-use std::os::unistd::Pid;
 use std::os::unix::process::CommandExt;
 
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg};
+use log::LevelFilter;
 
-use ptrace::helpers;
+mod logger; use logger::JtraceLogger;
+mod ptrace; use ptrace::helpers;
 
+
+static LOGGER: JtraceLogger = JtraceLogger;
 
 fn main() {
     let matches = App::new("jtrace")
@@ -52,33 +53,21 @@ fn main() {
                 .help("set verbosity for program logging output")
                 .takes_value(false)
                 .required(false)
-        )
-        .get_matches();
+        ).get_matches();
 
 
     // initialize logger
     let level_filter = match matches.occurrences_of("verbose") {
-        0 => LevelFilter::Info,
-        1 => LevelFilter::Debug,
-        _ => LevelFilter::Trace
+        2       => LevelFilter::Debug,
+        1       => LevelFilter::Warn,
+        0 | _   => LevelFilter::Error,
     };
+    log::set_logger(&LOGGER).expect("unable to initialize logger");
+    log::set_max_level(level_filter);
 
+    // collect args into vec
     let mut args = matches.values_of("command")
-                          .ok_or("unable to get child command")
+                          .unwrap() 
                           .collect::<Vec<&str>>();
-
-    // initialize a command with process builder
-    let mut cmd = Command::new(args.next().expect(matches.print_help()));
-    for arg in args {
-        cmd.arg(arg);
-    }
-
-    // perform an initial TRACEME to determine current process
-    cmd.before_exec(|| {
-        helpers::traceme()
-    });
-
-    // initialize handle to child process
-    let child_handle = cmd.spawn().expect("failed spawning child process");
-    let pid = Pid::from_raw(child_handle.id() as libc::pid_t);
+    debug!("cmd and args: {:?}", args);
 }
