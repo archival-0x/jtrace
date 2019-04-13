@@ -18,6 +18,8 @@ extern crate clap;
 use std::process::Command;
 use std::os::unix::process::CommandExt;
 
+use nix::unistd::*;
+
 use clap::{App, Arg};
 use log::LevelFilter;
 
@@ -51,6 +53,7 @@ fn main() {
                 .short("v")
                 .long("verbosity")
                 .help("set verbosity for program logging output")
+                .multiple(true)
                 .takes_value(false)
                 .required(false)
         ).get_matches();
@@ -59,7 +62,7 @@ fn main() {
     // initialize logger
     let level_filter = match matches.occurrences_of("verbose") {
         2       => LevelFilter::Debug,
-        1       => LevelFilter::Warn,
+        1       => LevelFilter::Info,
         0 | _   => LevelFilter::Error,
     };
     log::set_logger(&LOGGER).expect("unable to initialize logger");
@@ -67,7 +70,27 @@ fn main() {
 
     // collect args into vec
     let mut args = matches.values_of("command")
-                          .unwrap() 
+                          .unwrap()
                           .collect::<Vec<&str>>();
     debug!("cmd and args: {:?}", args);
+
+    // initialize command
+    let mut cmd = Command::new(&args[1]);
+    for arg in args {
+        cmd.arg(arg);
+    }
+    cmd.before_exec(|| {
+        helpers::traceme()
+    });
+
+    // fork child process
+    info!("Forking child process from parent");
+    let result = fork().expect("unable to call fork(2)");
+    match result {
+        ForkResult::Parent { child } => {
+            println!("In parent process!");
+        },
+        ForkResult::Child => {
+        }
+    }
 }

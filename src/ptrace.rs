@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// ptrace.rs
 ///
 ///     Currently, `nix` support for `ptrace(2)` on the most recent
@@ -5,49 +6,91 @@
 ///     This is a re-implementation of `ptrace(2)` that allows safer
 ///     usage through a specialized helper function.
 
-mod ptrace {
-    use libc::{c_int, c_long, c_void, pid_t};
-    use nix::errno::Errno;
 
-    /// while the parameters of `ptrace(2)` call for
-    /// a `enum __ptrace_request`, we simplify it for FFI
-    /// and instead define as an alias to a C integer.
-    pub type PtraceRequest = c_int;
-
+mod consts {
+    
     /// these represent `PtraceRequest`s a tracer
     /// can send to tracee in order to perform actions
     /// on attached process.
-    pub const PTRACE_TRACEME:     PtraceRequest = 0;
-    pub const PTRACE_PEEKTEXT:    PtraceRequest = 1;
-    pub const PTRACE_PEEKDATA:    PtraceRequest = 2;
-    pub const PTRACE_PEEKUSER:    PtraceRequest = 3;
-    pub const PTRACE_POKETEXT:    PtraceRequest = 4;
-    pub const PTRACE_POKEDATA:    PtraceRequest = 5;
-    pub const PTRACE_POKEUSER:    PtraceRequest = 6;
-    pub const PTRACE_CONT:        PtraceRequest = 7;
-    pub const PTRACE_KILL:        PtraceRequest = 8;
-    pub const PTRACE_SINGLESTEP:  PtraceRequest = 9;
-    pub const PTRACE_GETREGS:     PtraceRequest = 12;
-    pub const PTRACE_SETREGS:     PtraceRequest = 13;
-    pub const PTRACE_GETFPREGS:   PtraceRequest = 14;
-    pub const PTRACE_SETFPREGS:   PtraceRequest = 15;
-    pub const PTRACE_ATTACH:      PtraceRequest = 16;
-    pub const PTRACE_DETACH:      PtraceRequest = 17;
-    pub const PTRACE_GETFPXREGS:  PtraceRequest = 18;
-    pub const PTRACE_SETFPXREGS:  PtraceRequest = 19;
-    pub const PTRACE_SYSCALL:     PtraceRequest = 24;
-    pub const PTRACE_SETOPTIONS:  PtraceRequest = 0x4200;
-    pub const PTRACE_GETEVENTMSG: PtraceRequest = 0x4201;
-    pub const PTRACE_GETSIGINFO:  PtraceRequest = 0x4202;
-    pub const PTRACE_SETSIGINFO:  PtraceRequest = 0x4203;
-    pub const PTRACE_GETREGSET:   PtraceRequest = 0x4204;
-    pub const PTRACE_SETREGSET:   PtraceRequest = 0x4205;
-    pub const PTRACE_SEIZE:       PtraceRequest = 0x4206;
-    pub const PTRACE_INTERRUPT:   PtraceRequest = 0x4207;
-    pub const PTRACE_LISTEN:      PtraceRequest = 0x4208;
-    pub const PTRACE_PEEKSIGINFO: PtraceRequest = 0x4209;
+    pub mod requests {
+        use libc::c_int;
+
+        /// while the parameters of `ptrace(2)` call for
+        /// a `enum __ptrace_request`, we simplify it for FFI
+        /// and instead define as an alias to a C integer.
+        type PtraceRequest = c_int;
+      
+        pub const PTRACE_TRACEME:     PtraceRequest = 0;
+        pub const PTRACE_PEEKTEXT:    PtraceRequest = 1;
+        pub const PTRACE_PEEKDATA:    PtraceRequest = 2;
+        pub const PTRACE_PEEKUSER:    PtraceRequest = 3;
+        pub const PTRACE_POKETEXT:    PtraceRequest = 4;
+        pub const PTRACE_POKEDATA:    PtraceRequest = 5;
+        pub const PTRACE_POKEUSER:    PtraceRequest = 6;
+        pub const PTRACE_CONT:        PtraceRequest = 7;
+        pub const PTRACE_KILL:        PtraceRequest = 8;
+        pub const PTRACE_SINGLESTEP:  PtraceRequest = 9;
+        pub const PTRACE_GETREGS:     PtraceRequest = 12;
+        pub const PTRACE_SETREGS:     PtraceRequest = 13;
+        pub const PTRACE_GETFPREGS:   PtraceRequest = 14;
+        pub const PTRACE_SETFPREGS:   PtraceRequest = 15;
+        pub const PTRACE_ATTACH:      PtraceRequest = 16;
+        pub const PTRACE_DETACH:      PtraceRequest = 17;
+        pub const PTRACE_GETFPXREGS:  PtraceRequest = 18;
+        pub const PTRACE_SETFPXREGS:  PtraceRequest = 19;
+        pub const PTRACE_SYSCALL:     PtraceRequest = 24;
+        pub const PTRACE_SETOPTIONS:  PtraceRequest = 0x4200;
+        pub const PTRACE_GETEVENTMSG: PtraceRequest = 0x4201;
+        pub const PTRACE_GETSIGINFO:  PtraceRequest = 0x4202;
+        pub const PTRACE_SETSIGINFO:  PtraceRequest = 0x4203;
+        pub const PTRACE_GETREGSET:   PtraceRequest = 0x4204;
+        pub const PTRACE_SETREGSET:   PtraceRequest = 0x4205;
+        pub const PTRACE_SEIZE:       PtraceRequest = 0x4206;
+        pub const PTRACE_INTERRUPT:   PtraceRequest = 0x4207;
+        pub const PTRACE_LISTEN:      PtraceRequest = 0x4208;
+        pub const PTRACE_PEEKSIGINFO: PtraceRequest = 0x4209;
+    }
+
+	// TODO: docstring
+    pub mod regs {
+
+		//pub type RegVal = i64;
+
+        pub const R15:		   i64 = 0 * 8;
+        pub const R14:		   i64 = 1 * 8;
+        pub const R13:		   i64 = 2 * 8;
+        pub const R12:		   i64 = 3 * 8;
+        pub const RBP:		   i64 = 4 * 8;
+        pub const RBX:		   i64 = 5 * 8;
+        pub const R11:		   i64 = 6 * 8;
+        pub const R10:		   i64 = 7 * 8;
+        pub const R9:		   i64 = 8 * 8;
+        pub const R8:		   i64 = 9 * 8;
+        pub const RAX:		   i64 = 10 * 8;
+        pub const RCX:		   i64 = 11 * 8;
+        pub const RDX:		   i64 = 12 * 8;
+        pub const RSI:		   i64 = 13 * 8;
+        pub const RDI:		   i64 = 14 * 8;
+        pub const ORIG_RAX:    i64 = 15 * 8;
+        pub const RIP: 		   u64 = 16 * 8;
+        pub const CS: 		   i64 = 17 * 8;
+        pub const EFLAGS: 	   i64 = 18 * 8;
+        pub const RSP: 		   i64 = 19 * 8;
+        pub const SS: 		   i64 = 20 * 8;
+        pub const FS_BASE: 	   i64 = 21 * 8;
+        pub const GS_BASE: 	   i64 = 22 * 8;
+        pub const DS:		   i64 = 23 * 8;
+        pub const ES:		   i64 = 24 * 8;
+        pub const FS:		   i64 = 25 * 8;
+		pub const GS:		   i64 = 26 * 8;
+    }
+}
 
 
+mod ptrace {
+    use libc::{c_int, c_long, c_void, pid_t};
+    use nix::errno::Errno;
+   
     /// defines an `unsafe` foreign function interface to the `ptrace(2)` system call.
     /// `ptrace(2)`'s original C function definition is as follows:
     ///
@@ -63,12 +106,13 @@ mod ptrace {
 
     /// `exec_ptrace()` is the main and safest interface for calling the unsafe `ptrace` FFI.
     /// It does error-checking to ensure that the user receives errors through Result<T>, and
-    pub fn exec_ptrace(request: PtraceRequest, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> Result<i64, Errno> {
+    pub fn exec_ptrace(request: c_int, pid: pid_t, addr: *mut c_void, data: *mut c_void) -> Result<i64, Errno> {
+        use ptrace::consts::requests;
 
         // on PTRACE_PEEK* commands, a successful request might still return -1. As a result,
         // we need to clear errno and do some other error-checking.
         match request {
-            PTRACE_PEEKTEXT | PTRACE_PEEKDATA | PTRACE_PEEKUSER => {
+            requests::PTRACE_PEEKTEXT | requests::PTRACE_PEEKDATA | requests::PTRACE_PEEKUSER => {
                 // grab return value of ptrace call (notice no semicolon)
                 let ret = unsafe {
                     Errno::clear();
@@ -91,6 +135,8 @@ mod ptrace {
             _ => Ok(0)
         }
     }
+
+
 }
 
 
@@ -99,10 +145,11 @@ mod ptrace {
 /// in order to perform process debugging.
 pub mod helpers {
     use std::ptr;
-    use nix::errno::Errno;
+    use std::io::{Error, ErrorKind};
     use libc::pid_t;
 
-    use ptrace::ptrace::*;
+    use ptrace::{ptrace, consts};
+
 
     /// alias the pid_t for better clarification
     type InferiorType = pid_t;
@@ -111,10 +158,22 @@ pub mod helpers {
     /// `traceme()` call with error-checking. PTRACE_TRACEME is used as a method
     /// used to check the process that the user is currently in, such as ensuring that
     /// a fork call actually spawned off a child process.
-    pub fn traceme() -> Result<(), Errno> {
-        if let Err(e) = exec_ptrace(PTRACE_TRACEME, 0, ptr::null_mut(), ptr::null_mut()) {
-            //panic!("Failed PTRACE_TRACEME: {:?}", e);
-            return Err(e);
+    pub fn traceme() -> Result<(), Error> {
+        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_TRACEME, 0, ptr::null_mut(), ptr::null_mut()) {
+            let err = Error::new(ErrorKind::Other, e.desc());
+            return Err(err);
+        }
+        Ok(())
+    }
+
+
+    /// `syscall()` call with error-checking. PTRACE_SYSCALL is used when tracer steps through
+    /// syscall entry/exit in trace, and enables debugging process to perform further
+    /// introspection.
+    pub fn syscall(pid: InferiorType) -> Result<(), Error> {
+        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_SYSCALL, pid, ptr::null_mut(), ptr::null_mut()) {
+            let err = Error::new(ErrorKind::Other, e.desc());
+            return Err(err);
         }
         Ok(())
     }
@@ -122,11 +181,18 @@ pub mod helpers {
 
     /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart
     /// stopped tracee process.
-    pub fn cont(pid: InferiorType) -> Result<(), Errno> {
-        if let Err(e) = exec_ptrace(PTRACE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
-            //panic!("Failed PTRACE_CONTINUE: {:?}", e);
-            return Err(e);
+    pub fn cont(pid: InferiorType) -> Result<(), Error> {
+        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
+            let err = Error::new(ErrorKind::Other, e.desc());
+            return Err(err);
         }
         Ok(())
     }
+
+	/// `peek_user()` call with error-checking. PTRACE_PEEKUSER is used in order to
+	/// introspect register values when encountering SYSCALL_ENTER or SYSCALL_EXIT. 
+	pub fn peek_user(pid: InferiorType, register: i64) -> Result<(), Error> {
+		// TODO
+	}
+
 }

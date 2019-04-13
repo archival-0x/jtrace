@@ -11,14 +11,14 @@ pub struct JtraceLogger;
 impl log::Log for JtraceLogger {
    
     // we always logging!
-    fn enabled(&self, metadata: &Metadata) -> bool { true }
+    fn enabled(&self, _metadata: &Metadata) -> bool { true }
 
     fn log(&self, record: &Record) {
 
         // determine prefix from log level
         let prefix = match record.level() {
             Level::Error    => "[ERROR] ",
-            Level::Warn     => "[WARN] ",
+            Level::Info     => "[INFO] ",
             _               => "[DEBUG] ",
         };
 
