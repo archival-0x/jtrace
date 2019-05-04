@@ -8,7 +8,7 @@
 
 
 mod consts {
-    
+
     /// these represent `PtraceRequest`s a tracer
     /// can send to tracee in order to perform actions
     /// on attached process.
@@ -19,7 +19,7 @@ mod consts {
         /// a `enum __ptrace_request`, we simplify it for FFI
         /// and instead define as an alias to a C integer.
         type PtraceRequest = c_int;
-      
+
         pub const PTRACE_TRACEME:     PtraceRequest = 0;
         pub const PTRACE_PEEKTEXT:    PtraceRequest = 1;
         pub const PTRACE_PEEKDATA:    PtraceRequest = 2;
@@ -54,35 +54,35 @@ mod consts {
 	// TODO: docstring
     pub mod regs {
 
-		//pub type RegVal = i64;
+		type RegVal = i64;
 
-        pub const R15:		   i64 = 0 * 8;
-        pub const R14:		   i64 = 1 * 8;
-        pub const R13:		   i64 = 2 * 8;
-        pub const R12:		   i64 = 3 * 8;
-        pub const RBP:		   i64 = 4 * 8;
-        pub const RBX:		   i64 = 5 * 8;
-        pub const R11:		   i64 = 6 * 8;
-        pub const R10:		   i64 = 7 * 8;
-        pub const R9:		   i64 = 8 * 8;
-        pub const R8:		   i64 = 9 * 8;
-        pub const RAX:		   i64 = 10 * 8;
-        pub const RCX:		   i64 = 11 * 8;
-        pub const RDX:		   i64 = 12 * 8;
-        pub const RSI:		   i64 = 13 * 8;
-        pub const RDI:		   i64 = 14 * 8;
-        pub const ORIG_RAX:    i64 = 15 * 8;
-        pub const RIP: 		   u64 = 16 * 8;
-        pub const CS: 		   i64 = 17 * 8;
-        pub const EFLAGS: 	   i64 = 18 * 8;
-        pub const RSP: 		   i64 = 19 * 8;
-        pub const SS: 		   i64 = 20 * 8;
-        pub const FS_BASE: 	   i64 = 21 * 8;
-        pub const GS_BASE: 	   i64 = 22 * 8;
-        pub const DS:		   i64 = 23 * 8;
-        pub const ES:		   i64 = 24 * 8;
-        pub const FS:		   i64 = 25 * 8;
-		pub const GS:		   i64 = 26 * 8;
+        pub const R15:		   RegVal = 0 * 8;
+        pub const R14:		   RegVal = 1 * 8;
+        pub const R13:		   RegVal = 2 * 8;
+        pub const R12:		   RegVal = 3 * 8;
+        pub const RBP:		   RegVal = 4 * 8;
+        pub const RBX:		   RegVal = 5 * 8;
+        pub const R11:		   RegVal = 6 * 8;
+        pub const R10:		   RegVal = 7 * 8;
+        pub const R9:		   RegVal = 8 * 8;
+        pub const R8:		   RegVal = 9 * 8;
+        pub const RAX:		   RegVal = 10 * 8;
+        pub const RCX:		   RegVal = 11 * 8;
+        pub const RDX:		   RegVal = 12 * 8;
+        pub const RSI:		   RegVal = 13 * 8;
+        pub const RDI:		   RegVal = 14 * 8;
+        pub const ORIG_RAX:    RegVal = 15 * 8;
+        pub const RIP: 		   u64    = 16 * 8;
+        pub const CS: 		   RegVal = 17 * 8;
+        pub const EFLAGS: 	   RegVal = 18 * 8;
+        pub const RSP: 		   RegVal = 19 * 8;
+        pub const SS: 		   RegVal = 20 * 8;
+        pub const FS_BASE: 	   RegVal = 21 * 8;
+        pub const GS_BASE: 	   RegVal = 22 * 8;
+        pub const DS:		   RegVal = 23 * 8;
+        pub const ES:		   RegVal = 24 * 8;
+        pub const FS:		   RegVal = 25 * 8;
+		pub const GS:		   RegVal = 26 * 8;
     }
 }
 
@@ -90,7 +90,7 @@ mod consts {
 mod ptrace {
     use libc::{c_int, c_long, c_void, pid_t};
     use nix::errno::Errno;
-   
+
     /// defines an `unsafe` foreign function interface to the `ptrace(2)` system call.
     /// `ptrace(2)`'s original C function definition is as follows:
     ///
@@ -113,6 +113,7 @@ mod ptrace {
         // we need to clear errno and do some other error-checking.
         match request {
             requests::PTRACE_PEEKTEXT | requests::PTRACE_PEEKDATA | requests::PTRACE_PEEKUSER => {
+
                 // grab return value of ptrace call (notice no semicolon)
                 let ret = unsafe {
                     Errno::clear();
@@ -123,7 +124,6 @@ mod ptrace {
                 if ret == -1 && Errno::last() != Errno::UnknownErrno {
                     return Err(Errno::last());
                 }
-
                 return Ok(ret);
             },
             _ => {},
@@ -135,8 +135,6 @@ mod ptrace {
             _ => Ok(0)
         }
     }
-
-
 }
 
 
@@ -168,8 +166,7 @@ pub mod helpers {
 
 
     /// `syscall()` call with error-checking. PTRACE_SYSCALL is used when tracer steps through
-    /// syscall entry/exit in trace, and enables debugging process to perform further
-    /// introspection.
+    /// syscall entry/exit in trace, and enables debugging process to perform further introspection.
     pub fn syscall(pid: InferiorType) -> Result<(), Error> {
         if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_SYSCALL, pid, ptr::null_mut(), ptr::null_mut()) {
             let err = Error::new(ErrorKind::Other, e.desc());
@@ -179,8 +176,7 @@ pub mod helpers {
     }
 
 
-    /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart
-    /// stopped tracee process.
+    /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart stopped tracee process.
     pub fn cont(pid: InferiorType) -> Result<(), Error> {
         if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_CONT, pid, ptr::null_mut(), ptr::null_mut()) {
             let err = Error::new(ErrorKind::Other, e.desc());
@@ -189,10 +185,20 @@ pub mod helpers {
         Ok(())
     }
 
+
 	/// `peek_user()` call with error-checking. PTRACE_PEEKUSER is used in order to
-	/// introspect register values when encountering SYSCALL_ENTER or SYSCALL_EXIT. 
+	/// introspect register values when encountering SYSCALL_ENTER or SYSCALL_EXIT.
 	pub fn peek_user(pid: InferiorType, register: i64) -> Result<(), Error> {
-		// TODO
+        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_PEEKUSER, pid, register as *mut libc::c_void, ptr::null_mut()) {
+            let err = Error::new(ErrorKind::Other, e.desc());
+            return Err(err);
+        }
+        Ok(())
 	}
+
+
+    pub fn set_options(pid: InferiorType, options: i64) -> () {
+        // TODO: create PtraceOption enum and fill body
+    }
 
 }

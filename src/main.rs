@@ -10,15 +10,17 @@
 )]
 
 extern crate libc;
-extern crate nix;
 extern crate clap;
+extern crate nix;
 
 #[macro_use] extern crate log;
 
 use std::process::Command;
 use std::os::unix::process::CommandExt;
+use std::ffi::CString;
 
-use nix::unistd::*;
+use nix::unistd;
+use nix::sys::{signal, wait};
 
 use clap::{App, Arg};
 use log::LevelFilter;
@@ -29,6 +31,7 @@ mod ptrace; use ptrace::helpers;
 
 static LOGGER: JtraceLogger = JtraceLogger;
 
+#[allow(unused_must_use)]
 fn main() {
     let matches = App::new("jtrace")
         .about("process tracer that outputs deserialized JSON")
@@ -60,37 +63,59 @@ fn main() {
 
 
     // initialize logger
-    let level_filter = match matches.occurrences_of("verbose") {
+    let level_filter = match matches.occurrences_of("verbosity") {
+        3       => LevelFilter::Warn,
         2       => LevelFilter::Debug,
         1       => LevelFilter::Info,
-        0 | _   => LevelFilter::Error,
+        0 | _   => LevelFilter::Off,
     };
     log::set_logger(&LOGGER).expect("unable to initialize logger");
     log::set_max_level(level_filter);
+    info!("Initialized logger");
 
     // collect args into vec
-    let mut args = matches.values_of("command")
-                          .unwrap()
-                          .collect::<Vec<&str>>();
-    debug!("cmd and args: {:?}", args);
+    let args = matches.values_of("command")
+                      .unwrap()
+                      .collect::<Vec<&str>>();
+    debug!("Command and args: {:?}", args);
 
     // initialize command
-    let mut cmd = Command::new(&args[1]);
-    for arg in args {
+    let mut cmd = Command::new(args[0]);
+    for arg in args.iter().skip(1) {
         cmd.arg(arg);
     }
-    cmd.before_exec(|| {
-        helpers::traceme()
-    });
 
     // fork child process
     info!("Forking child process from parent");
-    let result = fork().expect("unable to call fork(2)");
+    let result = unistd::fork().expect("unable to call fork(2)");
     match result {
-        ForkResult::Parent { child } => {
-            println!("In parent process!");
+        unistd::ForkResult::Parent { child } => {
+            info!("Tracing parent process");
+
+            // in parent, wait for state change in child
+            info!("Waiting for child process to send SIGSTOP");
+
+            // TODO
         },
-        ForkResult::Child => {
+        unistd::ForkResult::Child => {
+            info!("Tracing child process");
+
+            // start tracing process, notifying parent through wait(2)
+            info!("Child process executing PTRACE_TRACEME");
+            helpers::traceme();
+
+            // send a SIGSTOP in order to stop child process for parent introspection
+            info!("Sending SIGSTOP, going back to parent process");
+            signal::kill(unistd::getpid(), signal::Signal::SIGSTOP);
+
+            // execute child process with tracing until termination
+            info!("Executing rest of child execution until termination");
+            let c_cmd = CString::new(args[0]).expect("failed to initialize CString command");
+            let c_args: Vec<CString> = args.iter()
+                .skip(1)
+                .map(|&arg| CString::new(arg).expect("CString::new() failed"))
+                .collect();
+            unistd::execvp(&c_cmd, &c_args).ok().expect("failed to call execve(2) in child process");
         }
     }
 }
