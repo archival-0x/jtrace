@@ -1,8 +1,8 @@
-/// main.rs
-///
-///     CLI entry point for ptrace wrapper and helper
-///     functions for performing process tracing
-///     and se/deserialization
+//! main.rs
+//!
+//!     CLI entry point for ptrace wrapper and helper
+//!     functions for performing process tracing
+//!     and se/deserialization
 
 #[cfg(all(target_os = "linux",
           any(target_arch = "x86",
@@ -92,10 +92,21 @@ fn main() {
         unistd::ForkResult::Parent { child } => {
             info!("Tracing parent process");
 
-            // in parent, wait for state change in child
+            // in parent, wait for process event from child
             info!("Waiting for child process to send SIGSTOP");
+            wait::waitpid(
+                child,
+                Some(wait::WaitPidFlag::__WALL | wait::WaitPidFlag::WNOHANG)
+            )
+            .expect("unable to wait for child pid");
 
-            // TODO
+            // set trace options
+            helpers::setoptions(child.as_raw(), /* TODO */);
+
+            // wait for syscall event in child
+            helpers::syscall(child.as_raw());
+
+            // process control loop
         },
         unistd::ForkResult::Child => {
             info!("Tracing child process");

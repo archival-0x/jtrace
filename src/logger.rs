@@ -1,15 +1,17 @@
-/// logger.rs
-///
-///     JtraceLogger logging facility implementation
-///     for CLI verbosity.
-
+//! logger.rs
+//!
+//!     JtraceLogger logging facility implementation
+//!     for CLI verbosity.
 use log::{Record, Level, Metadata};
 
-// empty struct implements log::Log
+
+/// empty struct representing logger, which will
+/// implement the log::Log trait
 pub struct JtraceLogger;
 
+
 impl log::Log for JtraceLogger {
-   
+
     // we always logging!
     fn enabled(&self, _metadata: &Metadata) -> bool { true }
 
