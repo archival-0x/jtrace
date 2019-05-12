@@ -8,7 +8,6 @@
           any(target_arch = "x86",
               target_arch = "x86_64")),
 )]
-
 extern crate libc;
 extern crate clap;
 extern crate nix;
@@ -16,7 +15,6 @@ extern crate nix;
 #[macro_use] extern crate log;
 
 use std::process::Command;
-use std::os::unix::process::CommandExt;
 use std::ffi::CString;
 
 use nix::unistd;
@@ -101,7 +99,7 @@ fn main() {
             .expect("unable to wait for child pid");
 
             // set trace options
-            helpers::setoptions(child.as_raw(), /* TODO */);
+            helpers::set_options(child.as_raw(), /* TODO */);
 
             // wait for syscall event in child
             helpers::syscall(child.as_raw());
