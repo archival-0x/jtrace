@@ -95,8 +95,7 @@ fn main() {
             wait::waitpid(
                 child,
                 Some(wait::WaitPidFlag::__WALL | wait::WaitPidFlag::WNOHANG)
-            )
-            .expect("unable to wait for child pid");
+            ).expect("unable to wait for child pid");
 
             // set trace options
             helpers::set_options(child.as_raw(), /* TODO */);
@@ -105,6 +104,8 @@ fn main() {
             helpers::syscall(child.as_raw());
 
             // process control loop
+            loop {
+            }
         },
         unistd::ForkResult::Child => {
             info!("Tracing child process");
@@ -113,9 +114,9 @@ fn main() {
             info!("Child process executing PTRACE_TRACEME");
             helpers::traceme();
 
-            // send a SIGSTOP in order to stop child process for parent introspection
-            info!("Sending SIGSTOP, going back to parent process");
-            signal::kill(unistd::getpid(), signal::Signal::SIGSTOP);
+            // send a SIGTRAP in order to stop child process for parent introspection
+            info!("Sending SIGTRAP, going back to parent process");
+            signal::kill(unistd::getpid(), signal::Signal::SIGTRAP);
 
             // execute child process with tracing until termination
             info!("Executing rest of child execution until termination");
