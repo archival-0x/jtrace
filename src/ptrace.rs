@@ -50,9 +50,27 @@ pub mod consts {
         pub const PTRACE_PEEKSIGINFO: PtraceRequest = 0x4209;
     }
 
-	// TODO: docstring
-    pub mod regs {
+    pub mod options {
+        use libc::c_int;
 
+        /// represents constants to be used for the `data`
+        /// parameter when calling ptrace with PTRACE_SETOPTIONS
+        type PtraceOption = c_int;
+
+		pub const PTRACE_O_TRACESYSGOOD:   PtraceOption = 0x01;
+        pub const PTRACE_O_TRACEFORK:	   PtraceOption = 0x02;
+        pub const PTRACE_O_TRACEVFORK:	   PtraceOption = 0x03;
+        pub const PTRACE_O_TRACECLONE:	   PtraceOption = 0x04;
+        pub const PTRACE_O_TRACEEXEC:	   PtraceOption = 0x05;
+        pub const PTRACE_O_TRACEVFORKDONE: PtraceOption = 0x06;
+        pub const PTRACE_O_TRACEEXIT: 	   PtraceOption = 0x07;
+		pub const PTRACE_O_TRACESECCOMP:   PtraceOption = 0x08;
+    }
+
+
+	pub mod regs {
+
+		/// i64 represents value register value
 		type RegVal = i64;
 
         pub const R15:		   RegVal = 0 * 8;
@@ -196,8 +214,13 @@ pub mod helpers {
 	}
 
 
-    pub fn set_options(pid: InferiorType, options: i64) -> () {
-        // TODO: create PtraceOption enum and fill body
+    /// `set_options()` called with error-checking. PTRACE_SETOPTIONS is called, with flag options set by users.
+    pub fn set_options(pid: InferiorType, options: i64) -> Result<(), Error> {
+        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_SETOPTIONS, pid, ptr::null_mut(), options as *mut libc::c_void) {
+            let err = Error::new(ErrorKind::Other, e.desc());
+            return Err(err);
+        }
+        Ok(())
     }
 
 }

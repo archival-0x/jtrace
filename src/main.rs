@@ -23,8 +23,12 @@ use nix::sys::{signal, wait};
 use clap::{App, Arg};
 use log::LevelFilter;
 
-mod logger; use logger::JtraceLogger;
-mod ptrace; use ptrace::helpers;
+mod logger;
+use logger::JtraceLogger;
+
+mod ptrace;
+use ptrace::consts::options;
+use ptrace::helpers;
 
 
 static LOGGER: JtraceLogger = JtraceLogger;
@@ -98,13 +102,14 @@ fn main() {
             ).expect("unable to wait for child pid");
 
             // set trace options
-            helpers::set_options(child.as_raw(), /* TODO */);
+            helpers::set_options(child.as_raw(), options::PTRACE_O_TRACESYSGOOD.into());
 
             // wait for syscall event in child
             helpers::syscall(child.as_raw());
 
             // process control loop
             loop {
+
             }
         },
         unistd::ForkResult::Child => {
@@ -118,14 +123,14 @@ fn main() {
             info!("Sending SIGTRAP, going back to parent process");
             signal::kill(unistd::getpid(), signal::Signal::SIGTRAP);
 
-            // execute child process with tracing until termination
+            // execute child process with tracing until terminationz
             info!("Executing rest of child execution until termination");
             let c_cmd = CString::new(args[0]).expect("failed to initialize CString command");
             let c_args: Vec<CString> = args.iter()
                 .skip(1)
                 .map(|&arg| CString::new(arg).expect("CString::new() failed"))
                 .collect();
-            unistd::execvp(&c_cmd, &c_args).ok().expect("failed to call execve(2) in child process");
+            unistd::execvp(&c_cmd, &c_args).ok().expect("failed to call execvp(2) in child process");
         }
     }
 }
