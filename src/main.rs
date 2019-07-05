@@ -16,6 +16,9 @@ extern crate nix;
 
 use std::process::Command;
 use std::ffi::CString;
+use std::error::Error;
+
+use libc::{pid_t, c_int};
 
 use nix::unistd;
 use nix::sys::{signal, wait};
@@ -30,8 +33,42 @@ mod ptrace;
 use ptrace::consts::options;
 use ptrace::helpers;
 
-
 static LOGGER: JtraceLogger = JtraceLogger;
+
+/// `Parent` provides an interface for initializing
+/// and interacting with a specified PID.
+struct Parent { pid: pid_t; }
+
+
+impl Parent {
+    fn new(pid: pid_t) -> Self {
+        Self { pid }
+    }
+
+    fn run(&self) -> Result<(), Error> {
+        self.wait()?;
+        loop {
+            match self.step() {
+                Err(e) => {
+                },
+                Ok(Some(status)) => {
+                },
+            }
+        }
+        Ok(())
+    }
+
+
+    fn step(&self) -> Result<Option<c_int>, Error> {
+        // TODO        
+    }
+
+
+    fn wait(&self) -> Result<Option<c_int>, Error> {
+        // TODO
+    }
+}
+
 
 #[allow(unused_must_use)]
 fn main() {
@@ -119,9 +156,9 @@ fn main() {
             info!("Child process executing PTRACE_TRACEME");
             helpers::traceme();
 
-            // send a SIGTRAP in order to stop child process for parent introspection
+            // send a SIGSTOP in order to stop child process for parent introspection
             info!("Sending SIGTRAP, going back to parent process");
-            signal::kill(unistd::getpid(), signal::Signal::SIGTRAP);
+            signal::kill(unistd::getpid(), signal::Signal::SIGSTOP);
 
             // execute child process with tracing until terminationz
             info!("Executing rest of child execution until termination");
