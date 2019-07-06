@@ -21,7 +21,7 @@ use std::error::Error;
 use libc::{pid_t, c_int};
 
 use nix::unistd;
-use nix::sys::{signal, wait};
+use nix::sys::signal;
 
 use clap::{App, Arg};
 use log::LevelFilter;
@@ -36,8 +36,10 @@ use ptrace::helpers;
 static LOGGER: JtraceLogger = JtraceLogger;
 
 /// `Parent` provides an interface for initializing
-/// and interacting with a specified PID.
-struct Parent { pid: pid_t; }
+/// and interacting with a specified PID. It implements
+/// internal controls and establishes helpers for syscalls
+/// that are needed for tracer/tracee interactions.
+struct Parent { pid: pid_t }
 
 
 impl Parent {
@@ -45,28 +47,51 @@ impl Parent {
         Self { pid }
     }
 
-    fn run(&self) -> Result<(), Error> {
-        self.wait()?;
+
+    fn run(&self) -> Result<(), ()> {
         loop {
             match self.step() {
                 Err(e) => {
                 },
                 Ok(Some(status)) => {
                 },
+                other => { other?; }
             }
         }
         Ok(())
     }
 
+    fn step(&self) -> Result<Option<c_int>, ()> {
+        self.next_syscall()?;
+        if let Some(status) = self.wait().unwrap() {
+            return Ok(Some(status));
+        }
 
-    fn step(&self) -> Result<Option<c_int>, Error> {
-        // TODO        
+        // DO STUFF!!
+   
+        self.next_syscall()?;
+        if let Some(status) = self.wait().unwrap() {
+            return Ok(Some(status));
+        }
     }
 
 
-    fn wait(&self) -> Result<Option<c_int>, Error> {
-        // TODO
+    /// `wait()` wrapper to waitpid/wait4, with error-checking in order
+    /// to return proper type back to developer.
+    fn wait(&self) -> Result<Option<c_int>, ()> {
+        let mut status = 0;
+        unsafe {
+            libc::waitpid(self.pid, &mut status, 0);
+
+            // error-check status set
+            if libc::WIFEXITED(status) {
+                Ok(Some(libc::WEXITSTATUS(status)))
+            } else {
+                Ok(None)
+            }
+        }
     }
+
 }
 
 
@@ -129,25 +154,25 @@ fn main() {
     let result = unistd::fork().expect("unable to call fork(2)");
     match result {
         unistd::ForkResult::Parent { child } => {
+            
+            // initialize wrapper for interactions
+            let pid = Parent::new(child);
+            
             info!("Tracing parent process");
 
             // in parent, wait for process event from child
             info!("Waiting for child process to send SIGSTOP");
-            wait::waitpid(
-                child,
-                Some(wait::WaitPidFlag::__WALL | wait::WaitPidFlag::WNOHANG)
-            ).expect("unable to wait for child pid");
+            if let Err(e) = pid.wait() {
+                panic!("Error: {:?}", e); 
+            }
 
             // set trace options
+            info!("Setting trace options with PTRACE_SETOPTIONS");
             helpers::set_options(child.as_raw(), options::PTRACE_O_TRACESYSGOOD.into());
 
-            // wait for syscall event in child
-            helpers::syscall(child.as_raw());
-
-            // process control loop
-            loop {
-
-            }
+            // execute loop that examines through syscalls
+            info!("Executing parent with tracing");
+            pid.run();
         },
         unistd::ForkResult::Child => {
             info!("Tracing child process");
