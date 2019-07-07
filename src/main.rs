@@ -14,9 +14,9 @@ extern crate nix;
 
 #[macro_use] extern crate log;
 
+use std::io;
 use std::process::Command;
 use std::ffi::CString;
-use std::error::Error;
 
 use libc::{pid_t, c_int};
 
@@ -48,7 +48,10 @@ impl Parent {
     }
 
 
-    fn run(&self) -> Result<(), ()> {
+    /// `run()` instantiates the loop that loops
+    /// through program execution, waiting and stepping
+    /// through each syscall
+    fn run(&self) -> io::Result<()> {
         loop {
             match self.step() {
                 Err(e) => {
@@ -61,24 +64,29 @@ impl Parent {
         Ok(())
     }
 
-    fn step(&self) -> Result<Option<c_int>, ()> {
-        self.next_syscall()?;
+    /// `step()` defines the main instrospection
+    /// performed ontop of the traced process, using
+    /// ptrace to parse syscall registers for output
+    fn step(&self) -> io::Result<Option<c_int>> {
+        helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
         }
 
         // DO STUFF!!
    
-        self.next_syscall()?;
+        helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
         }
+
+        Ok(None)
     }
 
 
     /// `wait()` wrapper to waitpid/wait4, with error-checking in order
     /// to return proper type back to developer.
-    fn wait(&self) -> Result<Option<c_int>, ()> {
+    fn wait(&self) -> io::Result<Option<c_int>> {
         let mut status = 0;
         unsafe {
             libc::waitpid(self.pid, &mut status, 0);
@@ -156,7 +164,7 @@ fn main() {
         unistd::ForkResult::Parent { child } => {
             
             // initialize wrapper for interactions
-            let pid = Parent::new(child);
+            let pid = Parent::new(child.as_raw());
             
             info!("Tracing parent process");
 

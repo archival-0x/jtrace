@@ -170,7 +170,7 @@ pub mod helpers {
     type InferiorType = pid_t;
 
     /// alias a null pointer type for ptrace type parameter
-    const NULL: *mut () = ptr::null_mut();
+    const NULL: *mut libc::c_void = ptr::null_mut();
 
 
     /// `traceme()` call with error-checking. PTRACE_TRACEME is used as a method
@@ -216,16 +216,24 @@ pub mod helpers {
         Ok(())
 	}
 
+
     /// `get_regs()` call with error-checking. PTRACE_GETREGS is used in order to
     /// get and store the currently set register state. The wrapper actually returns this back to
     /// the developer.
     pub fn get_regs(pid: InferiorType) -> Result<libc::user_regs_struct, Error> {
-        let mut regs: libc::user_regs_struct = mem::uninitialized();
-        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_GETREGS, pid, NULL, &mut regs as *mut _) {
-            let err = Error::new(ErrorKind::Other, e.desc());
-            return Err(err);
+        unsafe {
+
+            // initialize uninitialized memory for register struct
+            let regs: libc::user_regs_struct = mem::uninitialized();
+
+            // cast user_regs_struct to c_void using mem::transmute_copy
+            if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_GETREGS, pid, NULL,
+                                                mem::transmute_copy::<libc::user_regs_struct, *mut libc::c_void>(&regs)) {
+                let err = Error::new(ErrorKind::Other, e.desc());
+                return Err(err);
+            }
+            Ok(regs)
         }
-        Ok(regs)
     }
 
 
