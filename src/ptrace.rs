@@ -187,12 +187,14 @@ pub mod helpers {
 
     /// `syscall()` call with error-checking. PTRACE_SYSCALL is used when tracer steps through
     /// syscall entry/exit in trace, and enables debugging process to perform further introspection.
-    pub fn syscall(pid: InferiorType) -> Result<(), Error> {
-        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_SYSCALL, pid, NULL, NULL) {
-            let err = Error::new(ErrorKind::Other, e.desc());
-            return Err(err);
+    pub fn syscall(pid: InferiorType) -> Result<i64, Error> {
+        match ptrace::exec_ptrace(consts::requests::PTRACE_SYSCALL, pid, NULL, NULL) {
+            Err(e) => {
+                let err = Error::new(ErrorKind::Other, e.desc());
+                Err(err)
+            },
+            Ok(res) => Ok(res)
         }
-        Ok(())
     }
 
 
@@ -208,18 +210,20 @@ pub mod helpers {
 
 	/// `peek_user()` call with error-checking. PTRACE_PEEKUSER is used in order to
 	/// introspect register values when encountering SYSCALL_ENTER or SYSCALL_EXIT.
-	pub fn peek_user(pid: InferiorType, register: i64) -> Result<(), Error> {
-        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_PEEKUSER, pid, register as *mut libc::c_void, NULL) {
-            let err = Error::new(ErrorKind::Other, e.desc());
-            return Err(err);
+	pub fn peek_user(pid: InferiorType, register: i64) -> Result<i64, Error> {
+        match ptrace::exec_ptrace(consts::requests::PTRACE_PEEKUSER, pid, register as *mut libc::c_void, NULL){
+            Err(e) => {
+                let err = Error::new(ErrorKind::Other, e.desc());
+                Err(err)
+            },
+            Ok(res) => Ok(res)
         }
-        Ok(())
 	}
 
 
     /// `get_regs()` call with error-checking. PTRACE_GETREGS is used in order to
     /// get and store the currently set register state. The wrapper actually returns this back to
-    /// the developer.
+    /// the developer in a struct.
     pub fn get_regs(pid: InferiorType) -> Result<libc::user_regs_struct, Error> {
         unsafe {
 

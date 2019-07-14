@@ -30,7 +30,7 @@ mod logger;
 use logger::JtraceLogger;
 
 mod ptrace;
-use ptrace::consts::options;
+use ptrace::consts::{options, regs};
 use ptrace::helpers;
 
 static LOGGER: JtraceLogger = JtraceLogger;
@@ -51,12 +51,15 @@ impl Parent {
     /// `run()` instantiates the loop that loops
     /// through program execution, waiting and stepping
     /// through each syscall
-    fn run(&self) -> io::Result<()> {
+    fn run(&mut self) -> io::Result<()> {
         loop {
             match self.step() {
-                Err(e) => {
-                },
+                Err(e) => panic!("Unable to run tracer. Reason: {:?}", e),
                 Ok(Some(status)) => {
+                    if status == 0 {
+                        break;
+                    }
+                    // TODO
                 },
                 other => { other?; }
             }
@@ -67,13 +70,17 @@ impl Parent {
     /// `step()` defines the main instrospection
     /// performed ontop of the traced process, using
     /// ptrace to parse syscall registers for output
-    fn step(&self) -> io::Result<Option<c_int>> {
+    fn step(&mut self) -> io::Result<Option<c_int>> {
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
         }
 
-        // DO STUFF!!
+        let arg1 = match self.get_arg(0) {
+            Ok(r) => r,
+            Err(e) => panic!("Unable to retrieve register state. Reason {:?}", e),
+        };
+        println!("{}", arg1);
    
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
@@ -99,6 +106,24 @@ impl Parent {
             }
         }
     }
+
+
+    /// `get_arg()` is called to introspect current process
+    /// states register values in order to determine syscall
+    /// and arguments passed.
+    fn get_arg(&mut self, reg: u8) -> io::Result<u64> {
+        let offset = match reg {
+            0 => regs::RDI,
+            1 => regs::RSI,
+            2 => regs::RDX,
+            3 => regs::R10,
+            4 => regs::R8,
+            5 => regs::R9,
+            _ => panic!("Unmatched offset")
+        };
+        helpers::peek_user(self.pid, offset).map(|x| x as u64)
+    }
+
 
 }
 
@@ -153,8 +178,11 @@ fn main() {
 
     // initialize command
     let mut cmd = Command::new(args[0]);
-    for arg in args.iter().skip(1) {
-        cmd.arg(arg);
+    if args.len() > 1 {
+        for arg in args.iter().skip(1) {
+            debug!("Adding arg: {}", arg);
+            cmd.arg(arg);
+        }
     }
 
     // fork child process
@@ -164,7 +192,7 @@ fn main() {
         unistd::ForkResult::Parent { child } => {
             
             // initialize wrapper for interactions
-            let pid = Parent::new(child.as_raw());
+            let mut pid = Parent::new(child.as_raw());
             
             info!("Tracing parent process");
 
@@ -193,7 +221,7 @@ fn main() {
             info!("Sending SIGTRAP, going back to parent process");
             signal::kill(unistd::getpid(), signal::Signal::SIGSTOP);
 
-            // execute child process with tracing until terminationz
+            // execute child process with tracing until termination
             info!("Executing rest of child execution until termination");
             let c_cmd = CString::new(args[0]).expect("failed to initialize CString command");
             let c_args: Vec<CString> = args.iter()
