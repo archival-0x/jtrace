@@ -11,32 +11,36 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 // path to unistd file with syscall number definitions
 static SYSCALL_TABLE: &str = "/usr/include/asm/unistd_64.h";
 
 // regex for parsing macro definitions of syscall numbers
-static SYSCALL_REGEX: &str = r"^#define\s*__NR_(\w+)\s*(\d+)";
+static SYSCALL_REGEX: &str = r"#define\s*__NR_(\w+)\s*(\d+)";
 
+// type alias for syscall table hashmap
 type SyscallTable = HashMap<u64, String>;
+
 
 /// Defines an arbitrary syscall, with support for de/serialization
 /// with serde_json.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Syscall {
     number: u64,
     name: String,
-    args: Vec<String>,
+    args: Vec<u64>,
 }
 
 
 /// SyscallManager stores a vector of Syscalls and manages a HashMap
 /// that stores syscall num and name mappings.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct SyscallManager {
     syscalls: Vec<Syscall>,
-    _syscall_table: SyscallTable
+
+    #[serde(skip)]
+    pub _syscall_table: SyscallTable
 }
 
 
@@ -70,17 +74,29 @@ impl SyscallManager {
         tbl_file.read_to_string(&mut contents)?;
 
         lazy_static! {
-            static ref REF: Regex = Regex::new(SYSCALL_REGEX).expect("cannot initialize regex object");
+            static ref RE: Regex = Regex::new(SYSCALL_REGEX).expect("cannot initialize regex object");
         }
+        
+        // find matches and store as 2-ary tuple in vector
+        let matches: Vec<(u64, String)> = RE.captures_iter(&contents.as_str()).filter_map(|cap| {
+            let groups = (cap.get(2), cap.get(1));
+            match groups {
+                (Some(ref num), Some(ref name)) => {
+                    Some((num.as_str().parse::<u64>().expect("unable to parse u64 syscall number"), 
+                    name.as_str().to_string()))
+                },
+                _ => None
+            }
+        }).collect();
 
-        let syscall_table = HashMap::new();
+        let syscall_table: HashMap<_, _> = matches.into_iter().collect();
         Ok(syscall_table)
     }
 
 
     /// `add_syscall()` finds a corresponding syscall name from
     /// a parsed syscall table and instantiates and stores a new Syscall.
-    pub fn add_syscall(&mut self, syscall_num: u64, args: Vec<String>) -> () {
+    pub fn add_syscall(&mut self, syscall_num: u64, args: Vec<u64>) -> () {
 
         // retrieve syscall name from HashMap by syscall_num key
         let syscall_name = match self._syscall_table.get(&syscall_num) {

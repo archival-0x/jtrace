@@ -88,6 +88,14 @@ impl Parent {
             Err(e) => panic!("Cannot retrieve syscall number. Reason {:?}", e),
         };
 
+        // TODO: proper parsing of args
+        let args = vec![self.get_arg(0).unwrap(),
+                        self.get_arg(1).unwrap(),
+                        self.get_arg(2).unwrap()];
+
+        // initialize new syscall manager
+        let mut manager = SyscallManager::new();
+        manager.add_syscall(syscall_num, args);
 
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
@@ -119,7 +127,7 @@ impl Parent {
     /// states register values in order to determine syscall
     /// and arguments passed.
     fn get_arg(&mut self, reg: u8) -> io::Result<u64> {
-    
+
         // TODO: use different regs for different archs
         let offset = match reg {
             0 => regs::RDI,
@@ -206,16 +214,16 @@ fn main() {
     let result = unistd::fork().expect("unable to call fork(2)");
     match result {
         unistd::ForkResult::Parent { child } => {
-            
+
             // initialize wrapper for interactions
             let mut pid = Parent::new(child.as_raw());
-            
+
             info!("Tracing parent process");
 
             // in parent, wait for process event from child
             info!("Waiting for child process to send SIGSTOP");
             if let Err(e) = pid.wait() {
-                panic!("Error: {:?}", e); 
+                panic!("Error: {:?}", e);
             }
 
             // set trace options
