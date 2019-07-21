@@ -11,8 +11,11 @@
 extern crate libc;
 extern crate clap;
 extern crate nix;
+extern crate regex;
+extern crate serde;
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 
 use std::io;
 use std::process::Command;
@@ -32,6 +35,9 @@ use logger::JtraceLogger;
 mod ptrace;
 use ptrace::consts::{options, regs};
 use ptrace::helpers;
+
+mod syscall;
+use syscall::SyscallManager;
 
 static LOGGER: JtraceLogger = JtraceLogger;
 
@@ -76,12 +82,13 @@ impl Parent {
             return Ok(Some(status));
         }
 
-        let arg1 = match self.get_arg(0) {
-            Ok(r) => r,
-            Err(e) => panic!("Unable to retrieve register state. Reason {:?}", e),
+        // determine syscall number and initialize
+        let syscall_num = match self.get_syscall_num() {
+            Ok(num) => num,
+            Err(e) => panic!("Cannot retrieve syscall number. Reason {:?}", e),
         };
-        println!("{}", arg1);
-   
+
+
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
@@ -112,6 +119,8 @@ impl Parent {
     /// states register values in order to determine syscall
     /// and arguments passed.
     fn get_arg(&mut self, reg: u8) -> io::Result<u64> {
+    
+        // TODO: use different regs for different archs
         let offset = match reg {
             0 => regs::RDI,
             1 => regs::RSI,
@@ -119,9 +128,16 @@ impl Parent {
             3 => regs::R10,
             4 => regs::R8,
             5 => regs::R9,
-            _ => panic!("Unmatched offset")
+            _ => panic!("Unmatched argument offset")
         };
         helpers::peek_user(self.pid, offset).map(|x| x as u64)
+    }
+
+
+    /// `get_syscall_num()` uses ptrace with PEEK_USER to return the
+    /// syscall num from ORIG_RAX.
+    fn get_syscall_num(&mut self) -> io::Result<u64> {
+        helpers::peek_user(self.pid, regs::ORIG_RAX).map(|x| x as u64)
     }
 
 
@@ -225,7 +241,6 @@ fn main() {
             info!("Executing rest of child execution until termination");
             let c_cmd = CString::new(args[0]).expect("failed to initialize CString command");
             let c_args: Vec<CString> = args.iter()
-                .skip(1)
                 .map(|&arg| CString::new(arg).expect("CString::new() failed"))
                 .collect();
             unistd::execvp(&c_cmd, &c_args).ok().expect("failed to call execvp(2) in child process");
