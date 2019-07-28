@@ -1,6 +1,6 @@
 # jtrace
 
-process trace to json utility written in Rust
+system call tracer with JSON output capabilities in Rust
 
 ## intro
 
@@ -8,12 +8,24 @@ One of the things that are missing from common process tracing utilities (ie `st
 
 Besides being a security utility, __jtrace__ is also a PoC of a simple and native implementation of a process tracer.
 
-## features
-
-* safe and performant calls to `ptrace(2)`
-
 ## build
 
 ```
 $ cargo install
 ```
+
+## usage
+
+```
+# basic usage 
+$ jtrace -- ls .
+
+# with json output and verbosity
+$ jtrace -vv --out_json -- ls .
+```
+
+More (compelling) features coming soon!
+
+## license
+
+[mit](https://codemuch.tech/license.txt)
