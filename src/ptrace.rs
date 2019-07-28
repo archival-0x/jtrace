@@ -198,16 +198,6 @@ pub mod helpers {
     }
 
 
-    /// `cont()` call with error-checking. PTRACE_CONTINUE is used to restart stopped tracee process.
-    pub fn cont(pid: InferiorType) -> Result<(), Error> {
-        if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_CONT, pid, NULL, NULL) {
-            let err = Error::new(ErrorKind::Other, e.desc());
-            return Err(err);
-        }
-        Ok(())
-    }
-
-
 	/// `peek_user()` call with error-checking. PTRACE_PEEKUSER is used in order to
 	/// introspect register values when encountering SYSCALL_ENTER or SYSCALL_EXIT.
 	pub fn peek_user(pid: InferiorType, register: i64) -> Result<i64, Error> {
@@ -241,7 +231,7 @@ pub mod helpers {
     }
 
 
-    /// `set_options()` called with error-checking. PTRACE_SETOPTIONS is called, 
+    /// `set_options()` called with error-checking. PTRACE_SETOPTIONS is called,
     /// with flag options set by users.
     pub fn set_options(pid: InferiorType, options: i64) -> Result<(), Error> {
         if let Err(e) = ptrace::exec_ptrace(consts::requests::PTRACE_SETOPTIONS, pid, NULL, options as *mut libc::c_void) {
@@ -250,5 +240,4 @@ pub mod helpers {
         }
         Ok(())
     }
-
 }

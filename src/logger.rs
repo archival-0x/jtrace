@@ -2,6 +2,7 @@
 //!
 //!     JtraceLogger logging facility implementation
 //!     for CLI verbosity.
+
 use log::{Record, Level, Metadata};
 
 

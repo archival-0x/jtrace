@@ -6,12 +6,14 @@
 //!     in order to generate system calls with correct names.
 
 use std::io;
+use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
 
 use regex::Regex;
-use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Result;
 
 // path to unistd file with syscall number definitions
 static SYSCALL_TABLE: &str = "/usr/include/asm/unistd_64.h";
@@ -25,7 +27,7 @@ type SyscallTable = HashMap<u64, String>;
 
 /// Defines an arbitrary syscall, with support for de/serialization
 /// with serde_json.
-#[derive(Deserialize)]
+#[derive(Serialize)]
 pub struct Syscall {
     number: u64,
     name: String,
@@ -35,7 +37,8 @@ pub struct Syscall {
 
 /// SyscallManager stores a vector of Syscalls and manages a HashMap
 /// that stores syscall num and name mappings.
-#[derive(Deserialize)]
+#[derive(Serialize)]
+#[serde(rename = "syscalls")] 
 pub struct SyscallManager {
     syscalls: Vec<Syscall>,
 
@@ -115,4 +118,20 @@ impl SyscallManager {
         self.syscalls.push(syscall);
     }
 
+
+    pub fn to_json(&mut self) -> Result<String> {
+        serde_json::to_string(&self)
+    }
+}
+
+
+impl fmt::Display for SyscallManager {
+ 
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let syscalls: Vec<String> = self.syscalls
+            .iter()
+            .map(|x| format!("{}({:?})", x.name, x.args))
+            .collect();
+        write!(f, "{:?}", syscalls)
+    }
 }

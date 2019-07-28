@@ -13,6 +13,7 @@ extern crate clap;
 extern crate nix;
 extern crate regex;
 extern crate serde;
+extern crate serde_json;
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
@@ -45,12 +46,15 @@ static LOGGER: JtraceLogger = JtraceLogger;
 /// and interacting with a specified PID. It implements
 /// internal controls and establishes helpers for syscalls
 /// that are needed for tracer/tracee interactions.
-struct Parent { pid: pid_t }
+struct Parent { 
+    pid: pid_t,
+    out_json: bool
+}
 
 
 impl Parent {
-    fn new(pid: pid_t) -> Self {
-        Self { pid }
+    fn new(pid: pid_t, out_json: bool) -> Self {
+        Self { pid, out_json }
     }
 
 
@@ -58,6 +62,7 @@ impl Parent {
     /// through program execution, waiting and stepping
     /// through each syscall
     fn run(&mut self) -> io::Result<()> {
+        info!("Looping through process syscalls.");
         loop {
             match self.step() {
                 Err(e) => panic!("Unable to run tracer. Reason: {:?}", e),
@@ -77,6 +82,8 @@ impl Parent {
     /// performed ontop of the traced process, using
     /// ptrace to parse syscall registers for output
     fn step(&mut self) -> io::Result<Option<c_int>> {
+
+        info!("ptrace-ing with PTRACE_SYSCALL to SYS_ENTER");
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
@@ -87,6 +94,7 @@ impl Parent {
             Ok(num) => num,
             Err(e) => panic!("Cannot retrieve syscall number. Reason {:?}", e),
         };
+        debug!("Syscall number: {:?}", syscall_num);
 
         // TODO: proper parsing of args
         let args = vec![self.get_arg(0).unwrap(),
@@ -97,6 +105,14 @@ impl Parent {
         let mut manager = SyscallManager::new();
         manager.add_syscall(syscall_num, args);
 
+        // output based on configured flag
+        if self.out_json {
+            println!("{}", manager.to_json().expect("unable to output to JSON"));
+        } else {
+            println!("{}", manager);
+        }
+
+        info!("ptrace-ing with PTRACE_SYSCALL to SYS_EXIT");
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
@@ -160,32 +176,31 @@ fn main() {
         .arg(
             Arg::with_name("command")
                 .raw(true)
-                .help("command to analyze as child (including arguments and flags)")
+                .help("Command to analyze as child, including positional arguments.")
                 .takes_value(true)
                 .required(true)
         )
         .arg(
             Arg::with_name("out_json")
-                .short("o")
-                .long("output")
-                .help("name of json file to save output in")
-                .takes_value(true)
+                .short("j")
+                .long("out_json")
+                .help("Output system call trace as JSON.")
+                .takes_value(false)
                 .required(false)
         )
         .arg(
             Arg::with_name("verbosity")
                 .short("v")
                 .long("verbosity")
-                .help("set verbosity for program logging output")
+                .help("Sets verbosity for program logging output.")
                 .multiple(true)
                 .takes_value(false)
                 .required(false)
         ).get_matches();
 
 
-    // initialize logger
+    // initialize logger with basic logging levels
     let level_filter = match matches.occurrences_of("verbosity") {
-        3       => LevelFilter::Warn,
         2       => LevelFilter::Debug,
         1       => LevelFilter::Info,
         0 | _   => LevelFilter::Off,
@@ -198,7 +213,7 @@ fn main() {
     let args = matches.values_of("command")
                       .unwrap()
                       .collect::<Vec<&str>>();
-    debug!("Command and args: {:?}", args);
+    debug!("Command and arguments: {:?}", args);
 
     // initialize command
     let mut cmd = Command::new(args[0]);
@@ -216,7 +231,8 @@ fn main() {
         unistd::ForkResult::Parent { child } => {
 
             // initialize wrapper for interactions
-            let mut pid = Parent::new(child.as_raw());
+            let flag = matches.is_present("out_json");
+            let mut pid = Parent::new(child.as_raw(), flag);
 
             info!("Tracing parent process");
 
