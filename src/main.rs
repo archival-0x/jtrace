@@ -42,25 +42,30 @@ use syscall::SyscallManager;
 
 static LOGGER: JtraceLogger = JtraceLogger;
 
+
 /// `Parent` provides an interface for initializing
 /// and interacting with a specified PID. It implements
 /// internal controls and establishes helpers for syscalls
 /// that are needed for tracer/tracee interactions.
-struct Parent { 
+struct Parent {
     pid: pid_t,
+    manager: SyscallManager,
     out_json: bool
 }
 
 
 impl Parent {
+
+    /// `new()` initializes new Parent interface with PID and system call manager that stores
+    /// parsed system calls
     fn new(pid: pid_t, out_json: bool) -> Self {
-        Self { pid, out_json }
+        let manager = SyscallManager::new();
+        Self { pid, manager, out_json }
     }
 
 
-    /// `run()` instantiates the loop that loops
-    /// through program execution, waiting and stepping
-    /// through each syscall
+    /// `run()` instantiates the loop that goes through program execution, waiting and stepping
+    /// through each syscall and properly handling errors when necessary.
     fn run(&mut self) -> io::Result<()> {
         info!("Looping through process syscalls.");
         loop {
@@ -69,18 +74,27 @@ impl Parent {
                 Ok(Some(status)) => {
                     if status == 0 {
                         break;
+                    } else {
+                        debug!("Status reported: {:?}", status);
                     }
-                    // TODO
                 },
                 other => { other?; }
             }
         }
+
+        // TODO: better output
+        // output based on configured flag
+        if self.out_json {
+            println!("{}", self.manager.to_json().expect("unable to output to JSON"));
+        } else {
+            println!("{}", self.manager);
+        }
         Ok(())
     }
 
-    /// `step()` defines the main instrospection
-    /// performed ontop of the traced process, using
-    /// ptrace to parse syscall registers for output
+
+    /// `step()` defines the main instrospection performed ontop of the traced process, using
+    /// ptrace to parse out syscall registers for output.
     fn step(&mut self) -> io::Result<Option<c_int>> {
 
         info!("ptrace-ing with PTRACE_SYSCALL to SYS_ENTER");
@@ -101,23 +115,14 @@ impl Parent {
                         self.get_arg(1).unwrap(),
                         self.get_arg(2).unwrap()];
 
-        // initialize new syscall manager
-        let mut manager = SyscallManager::new();
-        manager.add_syscall(syscall_num, args);
-
-        // output based on configured flag
-        if self.out_json {
-            println!("{}", manager.to_json().expect("unable to output to JSON"));
-        } else {
-            println!("{}", manager);
-        }
+        // add syscall to manager
+        self.manager.add_syscall(syscall_num, args);
 
         info!("ptrace-ing with PTRACE_SYSCALL to SYS_EXIT");
         helpers::syscall(self.pid)?;
         if let Some(status) = self.wait().unwrap() {
             return Ok(Some(status));
         }
-
         Ok(None)
     }
 
@@ -143,8 +148,6 @@ impl Parent {
     /// states register values in order to determine syscall
     /// and arguments passed.
     fn get_arg(&mut self, reg: u8) -> io::Result<u64> {
-
-        // TODO: use different regs for different archs
         let offset = match reg {
             0 => regs::RDI,
             1 => regs::RSI,
@@ -163,8 +166,6 @@ impl Parent {
     fn get_syscall_num(&mut self) -> io::Result<u64> {
         helpers::peek_user(self.pid, regs::ORIG_RAX).map(|x| x as u64)
     }
-
-
 }
 
 
