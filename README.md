@@ -1,17 +1,26 @@
 # jtrace
 
-system call tracer with JSON output capabilities in Rust
+system call tracer with capabilities
 
 ## intro
 
-One of the things that are missing from common process tracing utilities (ie `strace`) is the ability to emit output in a serializable data format.
+__jtrace__ is a syscall tracer that has elevated capabilities implemented natively in Rust.
+At its core, it is simply a `strace` clone that can be used for learning about instrinics,
+but it also supports a variety of features not found in modern process tracers.
 
-Besides being a security utility, __jtrace__ is also a PoC of a simple and native implementation of a process tracer.
+## features
+
+* Supports eBPF (TODO) and `ptrace` modes of operation
+* Supports emitting output in a serializable data format (JSON)
+* (TODO) Library calls
 
 ## build
 
+Just like other process tracers, `jtrace` works out of the box without any auxiliary tools.
+
 ```
 $ cargo install
+$ jtrace -h
 ```
 
 ## usage

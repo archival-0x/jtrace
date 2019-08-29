@@ -38,7 +38,7 @@ pub struct Syscall {
 /// SyscallManager stores a vector of Syscalls and manages a HashMap
 /// that stores syscall num and name mappings.
 #[derive(Serialize)]
-#[serde(rename = "syscalls")] 
+#[serde(rename = "syscalls")]
 pub struct SyscallManager {
     syscalls: Vec<Syscall>,
 
@@ -79,13 +79,13 @@ impl SyscallManager {
         lazy_static! {
             static ref RE: Regex = Regex::new(SYSCALL_REGEX).expect("cannot initialize regex object");
         }
-        
+
         // find matches and store as 2-ary tuple in vector
         let matches: Vec<(u64, String)> = RE.captures_iter(&contents.as_str()).filter_map(|cap| {
             let groups = (cap.get(2), cap.get(1));
             match groups {
                 (Some(ref num), Some(ref name)) => {
-                    Some((num.as_str().parse::<u64>().expect("unable to parse u64 syscall number"), 
+                    Some((num.as_str().parse::<u64>().expect("unable to parse u64 syscall number"),
                     name.as_str().to_string()))
                 },
                 _ => None
@@ -126,8 +126,10 @@ impl SyscallManager {
 
 
 impl fmt::Display for SyscallManager {
- 
+
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        // collect syscalls into formattable string
         let syscalls: Vec<String> = self.syscalls
             .iter()
             .map(|x| format!("{}({:?})", x.name, x.args))

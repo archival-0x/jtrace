@@ -81,15 +81,24 @@ impl Parent {
                 other => { other?; }
             }
         }
+        self.output();
+        Ok(())
+    }
 
-        // TODO: better output
-        // output based on configured flag
+    /// `output()` is called after a run in order return trace results the configured format,
+    /// either as raw unstructured trace or in JSON
+    /// TODO: support other formats to deserialize
+    fn output(&mut self) -> () {
+
+        // JSON
         if self.out_json {
             println!("{}", self.manager.to_json().expect("unable to output to JSON"));
-        } else {
+        }
+
+        // Default raw output
+        else {
             println!("{}", self.manager);
         }
-        Ok(())
     }
 
 
@@ -110,10 +119,11 @@ impl Parent {
         };
         debug!("Syscall number: {:?}", syscall_num);
 
-        // TODO: proper parsing of args
-        let args = vec![self.get_arg(0).unwrap(),
-                        self.get_arg(1).unwrap(),
-                        self.get_arg(2).unwrap()];
+        // retrieve first 3 arguments from syscall
+        let mut args: Vec<u64> = Vec::new();
+        for i in 0..2 {
+            args.push(self.get_arg(i).unwrap());
+        }
 
         // add syscall to manager
         self.manager.add_syscall(syscall_num, args);
@@ -148,15 +158,31 @@ impl Parent {
     /// states register values in order to determine syscall
     /// and arguments passed.
     fn get_arg(&mut self, reg: u8) -> io::Result<u64> {
+
+        #[cfg(target_arch = "x86_64")]
         let offset = match reg {
             0 => regs::RDI,
             1 => regs::RSI,
             2 => regs::RDX,
-            3 => regs::R10,
+            3 => regs::RCX,
             4 => regs::R8,
             5 => regs::R9,
             _ => panic!("Unmatched argument offset")
         };
+
+        /* TODO: implement registers
+        #[cfg(target_arch = "x86")]
+        let offset = match reg {
+            0 => regs::EDI,
+            1 => regs::ESI,
+            2 => regs::EDX,
+            3 => regs::ECX,
+            4 => regs::E8,
+            5 => regs::E9,
+            _ => panic!("Unmatched argument offset")
+        };
+        */
+
         helpers::peek_user(self.pid, offset).map(|x| x as u64)
     }
 
