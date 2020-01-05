@@ -208,9 +208,9 @@ fn main() {
                 .required(true)
         )
         .arg(
-            Arg::with_name("out_json")
+            Arg::with_name("json")
                 .short("j")
-                .long("out_json")
+                .long("json")
                 .help("Output system call trace as JSON.")
                 .takes_value(false)
                 .required(false)
@@ -258,7 +258,7 @@ fn main() {
         unistd::ForkResult::Parent { child } => {
 
             // initialize wrapper for interactions
-            let flag = matches.is_present("out_json");
+            let flag = matches.is_present("json");
             let mut pid = Parent::new(child.as_raw(), flag);
 
             info!("Tracing parent process");
